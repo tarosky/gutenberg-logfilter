@@ -1,0 +1,47 @@
+{
+  "logs": [
+    {
+      "source": "test/work/test1.fifo",
+      "filterLists": [
+        [
+          {
+            "match": {
+              "regex": "^JSON:"
+            }
+          },
+          {
+            "extract": {
+              "regex": "\\{[^}]*\\}",
+              "printf": "%[1]s"
+            }
+          }
+        ],
+        [
+          {
+            "match": {
+              "regex": "^TEXT:"
+            }
+          },
+          {
+            "extract": {
+              "regex": "^TEXT: (.*)",
+              "printf": "{\"message\": \"%[2]s\"}"
+            }
+          }
+        ]
+      ],
+      "output": "test/work/test1.log"
+    },
+    {
+      "source": "test/work/test2.fifo",
+      "filterLists": [],
+      "output": "test/work/test2.log"
+    }
+  ],
+  "maxlines": 10,
+  "maxlinelen": 10000,
+  "statefile": "test/work/state.json",
+  "pidfile": "test/work/logfilter.pid",
+  "mylog": "test/work/logfilter.log",
+  "myerrorlog": "test/work/logfilter.error.log"
+}
