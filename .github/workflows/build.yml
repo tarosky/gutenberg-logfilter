@@ -41,24 +41,21 @@ jobs:
         path: work/BUILD_NUMBER
 
   test:
-    runs-on: ubuntu-20.04
-    defaults:
-      run:
-        working-directory: test
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-go@v2
       with:
         go-version: '^1.16.6'
     - run: go get -u github.com/jstemmer/go-junit-report
-    - run: go test -v . 2>&1 | tee work/test.log
+    - run: go test -v ./... 2>&1 | tee work/test.log
     - run: go-junit-report < work/test.log | tee work/report.xml
     - name: Publish Unit Test Results
       uses: EnricoMi/publish-unit-test-result-action@v1
       if: always()
       with:
         github_token: ${{secrets.GITHUB_TOKEN}}
-        files: test/work/report.xml
+        files: work/report.xml
 
   release:
     needs:

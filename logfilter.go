@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -338,34 +337,34 @@ func (fs *pfilters) initialize() error {
 	return nil
 }
 
-type pLog struct {
-	Source      AbsolutePath `json:"source"`
-	FilterLists []pfilters   `json:"filterLists"`
-	Output      AbsolutePath `json:"output"`
+type output struct {
+	Path AbsolutePath `json:"path"`
 }
 
-func (l *pLog) initialize() error {
-	for _, fs := range l.FilterLists {
-		if err := fs.initialize(); err != nil {
-			return err
-		}
-	}
-	return nil
+type route struct {
+	Filters pfilters `json:"filters"`
+	Output  string   `json:"output"`
+}
+
+func (r *route) initialize() error {
+	return r.Filters.initialize()
 }
 
 type configure struct {
-	Logs       []pLog       `json:"logs"`
-	MaxLines   int          `json:"maxlines"`
-	MaxLineLen int          `json:"maxlinelen"`
-	StateFile  AbsolutePath `json:"statefile"`
-	PIDFile    AbsolutePath `json:"pidfile"`
-	MyLog      AbsolutePath `json:"mylog"`
-	MyErrorLog AbsolutePath `json:"myerrorlog"`
+	Source     AbsolutePath      `json:"source"`
+	Routes     []route           `json:"routes"`
+	Outputs    map[string]output `json:"outputs"`
+	MaxLines   int               `json:"maxlines"`
+	MaxLineLen int               `json:"maxlinelen"`
+	StateFile  AbsolutePath      `json:"statefile"`
+	PIDFile    AbsolutePath      `json:"pidfile"`
+	MyLog      AbsolutePath      `json:"mylog"`
+	MyErrorLog AbsolutePath      `json:"myerrorlog"`
 }
 
 func (c *configure) initialize() error {
-	for _, l := range c.Logs {
-		if err := l.initialize(); err != nil {
+	for _, r := range c.Routes {
+		if err := r.initialize(); err != nil {
 			return err
 		}
 	}
@@ -407,13 +406,7 @@ func cliMain(ctx context.Context, args []string) {
 		}
 
 		configPath := mustGetAbsPath("config")
-		file, err := os.Open(configPath)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to read config file: %s", err.Error())
-			panic(err)
-		}
-
-		configData, err := ioutil.ReadAll(file)
+		configData, err := ioutil.ReadFile(configPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to read config data: %s", err.Error())
 			panic(err)
@@ -469,91 +462,95 @@ func cliMain(ctx context.Context, args []string) {
 	}
 }
 
-type pLogStatePair struct {
+type outputStatePair struct {
 	path  AbsolutePath
-	state *pLogState
+	state *outputState
 }
 
 func run(ctx context.Context, e *environment) error {
-	stateCh := make(chan *pLogStatePair)
+	stateCh := make(chan *outputStatePair)
 	done := make(chan *state)
 
 	go func() {
-		pLogs := make(map[AbsolutePath]pLogState, len(e.Logs))
+		outputs := make(map[AbsolutePath]*outputState, len(e.Outputs))
 		for pair := range stateCh {
-			pLogs[pair.path] = *pair.state
+			outputs[pair.path] = pair.state
 		}
 
-		done <- &state{PLogs: pLogs}
+		done <- &state{Outputs: outputs}
 		close(done)
 	}()
 
-	{
-		grp, ctx := errgroup.WithContext(ctx)
-		for _, pLog := range e.Logs {
-			pLog := pLog
-			var st *pLogState
-			if e.state != nil {
-				if s, ok := e.state.PLogs[pLog.Output]; ok {
-					st = &s
-				}
-			}
-			grp.Go(func() error {
-				newState, err := runPLog(ctx, e.log, &pLog, st, e.MaxLines, e.MaxLineLen)
-				stateCh <- &pLogStatePair{
-					path:  pLog.Output,
-					state: newState,
-				}
-				return err
-			})
-		}
-		grp.Wait()
-		close(stateCh)
+	inputCh := make(chan string, inputBufferSize)
+	outputsIn := make(map[string]chan<- string, len(e.Outputs))
+	outputsOut := make(map[string]<-chan string, len(e.Outputs))
+	for n := range e.Outputs {
+		ch := make(chan string, outputBufferSize)
+		outputsOut[n] = ch
+		outputsIn[n] = ch
 	}
 
-	st := <-done
-	if err := saveState(e.log, e.StateFile, st); err != nil {
+	grp := &errgroup.Group{}
+
+	grp.Go(func() error {
+		return processInput(ctx, e.log, inputCh, e.MaxLineLen, e.Source)
+	})
+
+	grp.Go(func() error {
+		return processRouting(e.log, inputCh, e.Routes, outputsIn)
+	})
+
+	for name, output := range e.Outputs {
+		name := name
+		output := output
+		grp.Go(func() error {
+			st, err := processOutput(e.log, outputsOut[name], output.Path, e.state.Outputs[output.Path], e.MaxLines)
+			stateCh <- &outputStatePair{
+				path:  output.Path,
+				state: st,
+			}
+			return err
+		})
+	}
+
+	grperr := grp.Wait()
+	close(stateCh)
+
+	if err := saveState(e.log, e.StateFile, <-done); err != nil {
 		return err
 	}
 
-	return nil
+	return grperr
 }
 
 type state struct {
-	PLogs map[AbsolutePath]pLogState `json:"logs"`
+	Outputs map[AbsolutePath]*outputState `json:"outputs"`
 }
 
-type pLogState struct {
+type outputState struct {
 	Rotation int `json:"rotation"`
 	Count    int `json:"count"`
 }
 
 func loadState(path AbsolutePath) *state {
-	file, err := os.Open(string(path))
+	stateData, err := ioutil.ReadFile(string(path))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil
-		}
-		fmt.Fprintf(os.Stderr, "failed to open state file: %s", err.Error())
-		panic(err)
-	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to close file: %s", err.Error())
+			stateData = []byte("{}")
+		} else {
+			fmt.Fprintf(os.Stderr, "failed to open state file: %s", err.Error())
 			panic(err)
 		}
-	}()
-
-	stateData, err := ioutil.ReadAll(file)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to read state data: %s", err.Error())
-		panic(err)
 	}
 
 	state := &state{}
 	if err := json.Unmarshal(stateData, state); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to unmarshal state data: %s", err.Error())
 		panic(err)
+	}
+
+	if state.Outputs == nil {
+		state.Outputs = map[AbsolutePath]*outputState{}
 	}
 
 	return state
@@ -589,39 +586,7 @@ func saveState(log *myLogger, path AbsolutePath, state *state) error {
 	return nil
 }
 
-func runPLog(
-	ctx context.Context,
-	log *myLogger,
-	pLog *pLog,
-	state *pLogState,
-	maxLines int,
-	maxLineLen int,
-) (*pLogState, error) {
-	inputCh := make(chan string, inputBufferSize)
-	outputCh := make(chan string, outputBufferSize)
-	newStateCh := make(chan *pLogState)
-
-	grp := &errgroup.Group{}
-
-	grp.Go(func() error {
-		return pLogInput(ctx, log, inputCh, maxLineLen, pLog.Source)
-	})
-	grp.Go(func() error {
-		return pLogFilter(log, inputCh, outputCh, pLog.FilterLists)
-	})
-	grp.Go(func() error {
-		st, err := pLogOutput(log, outputCh, pLog.Output, state, maxLines)
-		newStateCh <- st
-		close(newStateCh)
-		return err
-	})
-
-	newState := <-newStateCh
-
-	return newState, grp.Wait()
-}
-
-func pLogInput(
+func processInput(
 	ctx context.Context,
 	log *myLogger,
 	inputCh chan<- string,
@@ -636,12 +601,12 @@ func pLogInput(
 		case <-ctx.Done():
 			return nil
 		default:
-			pLogFileInput(ctx, log, inputCh, maxLineLen, source)
+			doProcessInput(ctx, log, inputCh, maxLineLen, source)
 		}
 	}
 }
 
-func pLogFileInput(
+func doProcessInput(
 	ctx context.Context,
 	log *myLogger,
 	inputCh chan<- string,
@@ -688,7 +653,6 @@ func pLogFileInput(
 
 	for {
 		ok, done, err := poller.wait()
-		log.Debug("polled", zap.Bool("ok", ok), zap.Bool("done", done), zap.Error(err))
 		if done {
 			return
 		}
@@ -703,10 +667,10 @@ func pLogFileInput(
 		}
 
 		for scan.scan() {
-			log.Debug("scanning")
+			// log.Debug("scanning")
 			inputCh <- scan.text()
 		}
-		log.Debug("scan finished")
+		// log.Debug("scan finished")
 		if err := scan.error(); err != nil {
 			log.Warn("error during scanning", zapSource, zap.Error(err))
 			close(aborted)
@@ -716,44 +680,52 @@ func pLogFileInput(
 	}
 }
 
-func pLogFilter(
+func processRouting(
 	log *myLogger,
 	inputCh <-chan string,
-	outputCh chan<- string,
-	filterLists []pfilters,
+	routes []route,
+	outputCh map[string]chan<- string,
 ) error {
-	defer close(outputCh)
+	defer func() {
+		for _, ch := range outputCh {
+			close(ch)
+		}
+	}()
+
 	for line := range inputCh {
-		l := processLine(line, filterLists)
-		outputCh <- l
+		name, l := processLine(line, routes)
+		if name == nil {
+			continue
+		}
+		outputCh[*name] <- l
 	}
 	return nil
 }
 
-func processLine(line string, filterLists []pfilters) string {
+func processLine(line string, routes []route) (*string, string) {
 outer:
-	for _, fList := range filterLists {
+	for _, route := range routes {
 		l := line
-		for _, f := range fList {
+		for _, f := range route.Filters {
 			if !f.try(l) {
 				continue outer
 			}
 			l = f.process(l)
 		}
-		return strings.TrimSpace(l)
+		return &route.Output, l
 	}
 
-	// No matching filterLists
-	return line
+	// No matching routes
+	return nil, ""
 }
 
-func pLogOutput(
+func processOutput(
 	log *myLogger,
 	outputCh <-chan string,
 	output AbsolutePath,
-	state *pLogState,
+	state *outputState,
 	maxLines int,
-) (*pLogState, error) {
+) (*outputState, error) {
 	suffixes := []string{".gu", ".chi", ".pa"}
 
 	lineCount := 0
@@ -844,7 +816,7 @@ func pLogOutput(
 		lineCount++
 	}
 
-	newState := &pLogState{
+	newState := &outputState{
 		Rotation: rotation,
 		Count:    lineCount,
 	}

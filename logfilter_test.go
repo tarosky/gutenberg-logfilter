@@ -44,8 +44,8 @@ func (s *LogFilterInputTestSuite) SetupTest() {
 func (s *LogFilterInputTestSuite) TearDownTest() {
 }
 
-func openFIFO1(s *suite.Suite) *os.File {
-	f, err := os.OpenFile(string(testFIFO1), os.O_WRONLY|os.O_APPEND, 0644)
+func openFIFO(s *suite.Suite) *os.File {
+	f, err := os.OpenFile(string(testFIFO), os.O_WRONLY|os.O_APPEND, 0644)
 	s.Require().NoError(err)
 	return f
 }
@@ -56,13 +56,14 @@ func (s *LogFilterInputTestSuite) TestOneLine() {
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		return pLogInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO1)
+		return processInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO)
 	})
 
-	f := openFIFO1(&s.Suite)
+	f := openFIFO(&s.Suite)
 	defer f.Close()
 	f.WriteString("foo\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
 
@@ -76,14 +77,15 @@ func (s *LogFilterInputTestSuite) TestTwoLinesAtOnce() {
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		return pLogInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO1)
+		return processInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO)
 	})
 
-	f := openFIFO1(&s.Suite)
+	f := openFIFO(&s.Suite)
 	defer f.Close()
 
 	f.WriteString("foo\nbar\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
 
@@ -98,16 +100,17 @@ func (s *LogFilterInputTestSuite) TestTwoLinesWithPause() {
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		return pLogInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO1)
+		return processInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO)
 	})
 
-	f := openFIFO1(&s.Suite)
+	f := openFIFO(&s.Suite)
 	defer f.Close()
 
 	f.WriteString("foo\n")
 	sleepABit()
 	f.WriteString("bar\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
 
@@ -122,16 +125,17 @@ func (s *LogFilterInputTestSuite) TestOneLineWithPause() {
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		return pLogInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO1)
+		return processInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO)
 	})
 
-	f := openFIFO1(&s.Suite)
+	f := openFIFO(&s.Suite)
 	defer f.Close()
 
 	f.WriteString("foo")
 	sleepABit()
 	f.WriteString("bar\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
 
@@ -145,10 +149,10 @@ func (s *LogFilterInputTestSuite) TestOneLineWithManyPauses() {
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		return pLogInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO1)
+		return processInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO)
 	})
 
-	f := openFIFO1(&s.Suite)
+	f := openFIFO(&s.Suite)
 	defer f.Close()
 
 	f.WriteString("f")
@@ -165,6 +169,7 @@ func (s *LogFilterInputTestSuite) TestOneLineWithManyPauses() {
 	sleepABit()
 	f.WriteString("\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
 
@@ -178,14 +183,15 @@ func (s *LogFilterInputTestSuite) TestOneLineWithoutNewLine() {
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		return pLogInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO1)
+		return processInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO)
 	})
 
-	f := openFIFO1(&s.Suite)
+	f := openFIFO(&s.Suite)
 	defer f.Close()
 
 	f.WriteString("foo")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
 
@@ -198,14 +204,15 @@ func (s *LogFilterInputTestSuite) TestEmptyLine() {
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		return pLogInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO1)
+		return processInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO)
 	})
 
-	f := openFIFO1(&s.Suite)
+	f := openFIFO(&s.Suite)
 	defer f.Close()
 
 	f.WriteString("foo\n\n\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
 
@@ -221,15 +228,16 @@ func (s *LogFilterInputTestSuite) TestLongLine() {
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		return pLogInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO1)
+		return processInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO)
 	})
 
-	f := openFIFO1(&s.Suite)
+	f := openFIFO(&s.Suite)
 	defer f.Close()
 
 	f.WriteString(strings.Repeat("1234567890", 12) + "\n")
 	f.WriteString("foo\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
 
@@ -244,15 +252,16 @@ func (s *LogFilterInputTestSuite) TestLongLongLine() {
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		return pLogInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO1)
+		return processInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO)
 	})
 
-	f := openFIFO1(&s.Suite)
+	f := openFIFO(&s.Suite)
 	defer f.Close()
 
 	f.WriteString(strings.Repeat("1234567890", 30) + "\n")
 	f.WriteString("foo\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
 
@@ -267,16 +276,17 @@ func (s *LogFilterInputTestSuite) TestMaxLine() {
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		return pLogInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO1)
+		return processInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO)
 	})
 
-	f := openFIFO1(&s.Suite)
+	f := openFIFO(&s.Suite)
 	defer f.Close()
 
 	line := strings.Repeat("1234567890", 9) + "123456789"
 	f.WriteString(line + "\n")
 	f.WriteString("foo\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
 
@@ -291,16 +301,17 @@ func (s *LogFilterInputTestSuite) TestMaxPlus1Line() {
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		return pLogInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO1)
+		return processInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO)
 	})
 
-	f := openFIFO1(&s.Suite)
+	f := openFIFO(&s.Suite)
 	defer f.Close()
 
 	line := strings.Repeat("1234567890", 10)
 	f.WriteString(line + "\n")
 	f.WriteString("foo\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
 
@@ -315,16 +326,17 @@ func (s *LogFilterInputTestSuite) TestConsecutiveLongLines() {
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		return pLogInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO1)
+		return processInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO)
 	})
 
-	f := openFIFO1(&s.Suite)
+	f := openFIFO(&s.Suite)
 	defer f.Close()
 
 	f.WriteString(strings.Repeat("abcdefghij", 11) + "\n")
 	f.WriteString(strings.Repeat("1234567890", 11) + "\n")
 	f.WriteString("foo\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
 
@@ -340,10 +352,10 @@ func (s *LogFilterInputTestSuite) TestConsecutiveLongLinesWithPauses() {
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		return pLogInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO1)
+		return processInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO)
 	})
 
-	f := openFIFO1(&s.Suite)
+	f := openFIFO(&s.Suite)
 	defer f.Close()
 
 	f.WriteString(strings.Repeat("abcdefghij", 11) + "\n")
@@ -352,6 +364,7 @@ func (s *LogFilterInputTestSuite) TestConsecutiveLongLinesWithPauses() {
 	sleepABit()
 	f.WriteString("foo\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
 
@@ -367,19 +380,20 @@ func (s *LogFilterInputTestSuite) TestCloseAndOpen() {
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		return pLogInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO1)
+		return processInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO)
 	})
 
-	f := openFIFO1(&s.Suite)
+	f := openFIFO(&s.Suite)
 	f.WriteString("foo\n")
 	f.Close()
 
 	sleepABit()
 
-	f2 := openFIFO1(&s.Suite)
+	f2 := openFIFO(&s.Suite)
 	f2.WriteString("bar\n")
 	f2.Close()
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
 
@@ -394,19 +408,20 @@ func (s *LogFilterInputTestSuite) TestCloseAndOpenDuringOutputtingALine() {
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		return pLogInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO1)
+		return processInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO)
 	})
 
-	f := openFIFO1(&s.Suite)
+	f := openFIFO(&s.Suite)
 	f.WriteString("foo")
 	f.Close()
 
 	sleepABit()
 
-	f2 := openFIFO1(&s.Suite)
+	f2 := openFIFO(&s.Suite)
 	f2.WriteString("bar\n")
 	f2.Close()
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
 
@@ -415,24 +430,25 @@ func (s *LogFilterInputTestSuite) TestCloseAndOpenDuringOutputtingALine() {
 }
 
 func (s *LogFilterInputTestSuite) TestFIFOCreatedAfterStart() {
-	s.Require().NoError(os.RemoveAll(string(testFIFO1)))
+	s.Require().NoError(os.RemoveAll(string(testFIFO)))
 
 	inputCh := make(chan string, enoughLineBuffer)
 	ctx, cancel := context.WithCancel(s.ctx)
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		return pLogInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO1)
+		return processInput(ctx, s.log, inputCh, testMaxLineLen, testFIFO)
 	})
 
 	sleepABit()
 
-	s.Require().NoError(syscall.Mkfifo(string(testFIFO1), 0644))
+	s.Require().NoError(syscall.Mkfifo(string(testFIFO), 0644))
 
-	f := openFIFO1(&s.Suite)
+	f := openFIFO(&s.Suite)
 	f.WriteString("foo\n")
 	defer f.Close()
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
 
@@ -440,76 +456,89 @@ func (s *LogFilterInputTestSuite) TestFIFOCreatedAfterStart() {
 	s.Assert().Equal("foo", <-inputCh)
 }
 
-func initLogFilterFilterTestSuite() *LogFilterFilterTestSuite {
+func initLogFilterRoutingTestSuite() *LogFilterRoutingTestSuite {
 	fixWorkDir()
 
 	ctx := context.Background()
 
-	return &LogFilterFilterTestSuite{ctx: ctx}
+	return &LogFilterRoutingTestSuite{ctx: ctx}
 }
 
-// LogFilterFilterTestSuite holds configs and sessions required to execute program.
-type LogFilterFilterTestSuite struct {
+// LogFilterRoutingTestSuite holds configs and sessions required to execute program.
+type LogFilterRoutingTestSuite struct {
 	suite.Suite
 	ctx context.Context
 	log *myLogger
 }
 
-func TestLogFilterFilterSuite(t *testing.T) {
-	s := initLogFilterFilterTestSuite()
+func TestLogFilterRoutingSuite(t *testing.T) {
+	s := initLogFilterRoutingTestSuite()
 	suite.Run(t, s)
 }
 
-func (s *LogFilterFilterTestSuite) SetupTest() {
+func (s *LogFilterRoutingTestSuite) SetupTest() {
 	s.log = createLogger(s.ctx, logPath, errorLogPath)
 }
 
-func (s *LogFilterFilterTestSuite) TearDownTest() {
+func (s *LogFilterRoutingTestSuite) TearDownTest() {
 }
 
-func (s *LogFilterFilterTestSuite) TestSimple() {
-	filterLists := []pfilters{
+func (s *LogFilterRoutingTestSuite) TestSimple() {
+	routes := []route{
 		{
-			&match{
-				Regex: "^INFO: ",
-				regex: regexp.MustCompile("^INFO: "),
+			Filters: []pfilter{
+				&match{
+					Regex: "^TYPE1: ",
+					regex: regexp.MustCompile("^TYPE1: "),
+				},
+				&extract{
+					Regex:  "\\{[^}]*\\}",
+					Printf: "%[1]s",
+					regex:  regexp.MustCompile(`\{[^}]*\}`),
+				},
 			},
-			&extract{
-				Regex:  "\\{[^}]*\\}",
-				Printf: "%[1]s",
-				regex:  regexp.MustCompile(`\{[^}]*\}`),
-			},
+			Output: "type1",
 		},
 		{
-			&extract{
-				Regex:  "^ERROR: (.*)$",
-				Printf: "{\"error\": \"%[2]s\"}",
-				regex:  regexp.MustCompile(`^ERROR: (.*)$`),
+			Filters: []pfilter{
+				&extract{
+					Regex:  "^TYPE2: (.*)$",
+					Printf: "{\"message\": \"%[2]s\"}",
+					regex:  regexp.MustCompile(`^TYPE2: (.*)$`),
+				},
 			},
+			Output: "type2",
 		},
 	}
 
 	input := make(chan string, enoughLineBuffer)
-	output := make(chan string, enoughLineBuffer)
 
-	go pLogFilter(s.log, input, output, filterLists)
+	outputType1 := make(chan string, enoughLineBuffer)
+	outputType2 := make(chan string, enoughLineBuffer)
+	outputs := map[string]chan<- string{
+		"type1": outputType1,
+		"type2": outputType2,
+	}
 
-	input <- "INFO: {foobar}"
-	input <- "INFO: foobar"
-	input <- "ERROR: foobar"
+	go processRouting(s.log, input, routes, outputs)
+
+	input <- "TYPE1: {foobar}"
+	input <- "TYPE1: {baz}"
+	input <- "TYPE1: foobar"
+	input <- "TYPE2: foobar"
 	input <- "WARN: foobar"
 	input <- ""
 	close(input)
 
 	sleepABit()
 
-	s.Assert().Equal("{foobar}", <-output)
-	s.Assert().Equal("INFO: foobar", <-output)
-	s.Assert().Equal("{\"error\": \"foobar\"}", <-output)
-	s.Assert().Equal("WARN: foobar", <-output)
-	s.Assert().Equal("", <-output)
+	s.Assert().Equal("{foobar}", <-outputType1)
+	s.Assert().Equal("{baz}", <-outputType1)
+	s.Assert().Equal("{\"message\": \"foobar\"}", <-outputType2)
 	var ok bool
-	_, ok = <-output
+	_, ok = <-outputType1
+	s.Assert().False(ok)
+	_, ok = <-outputType2
 	s.Assert().False(ok)
 }
 
@@ -544,11 +573,11 @@ func (s *LogFilterOutputSuite) TearDownTest() {
 func (s *LogFilterOutputSuite) TestSimple() {
 	output := make(chan string, enoughLineBuffer)
 
-	var st *pLogState
+	var st *outputState
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
 		var err error
-		st, err = pLogOutput(s.log, output, testLogPath1, nil, testMaxLines)
+		st, err = processOutput(s.log, output, testLogPathType1, nil, testMaxLines)
 		return err
 	})
 
@@ -562,11 +591,11 @@ func (s *LogFilterOutputSuite) TestSimple() {
 	s.Assert().Equal(10, st.Count)
 	s.Assert().Equal(0, st.Rotation)
 
-	s.Assert().FileExists(string(testLogPath1) + ".gu")
-	s.Assert().NoFileExists(string(testLogPath1) + ".chi")
-	s.Assert().NoFileExists(string(testLogPath1) + ".pa")
+	s.Assert().FileExists(string(testLogPathType1) + ".gu")
+	s.Assert().NoFileExists(string(testLogPathType1) + ".chi")
+	s.Assert().NoFileExists(string(testLogPathType1) + ".pa")
 
-	bs, err := ioutil.ReadFile(string(testLogPath1) + ".gu")
+	bs, err := ioutil.ReadFile(string(testLogPathType1) + ".gu")
 	s.Require().NoError(err)
 	s.Assert().Equal("0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n", string(bs))
 }
@@ -574,11 +603,11 @@ func (s *LogFilterOutputSuite) TestSimple() {
 func (s *LogFilterOutputSuite) TestRotate1() {
 	output := make(chan string, enoughLineBuffer)
 
-	var st *pLogState
+	var st *outputState
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
 		var err error
-		st, err = pLogOutput(s.log, output, testLogPath1, nil, testMaxLines)
+		st, err = processOutput(s.log, output, testLogPathType1, nil, testMaxLines)
 		return err
 	})
 
@@ -592,11 +621,11 @@ func (s *LogFilterOutputSuite) TestRotate1() {
 	s.Assert().Equal(10, st.Count)
 	s.Assert().Equal(1, st.Rotation)
 
-	s.Assert().FileExists(string(testLogPath1) + ".gu")
-	s.Assert().FileExists(string(testLogPath1) + ".chi")
-	s.Assert().NoFileExists(string(testLogPath1) + ".pa")
+	s.Assert().FileExists(string(testLogPathType1) + ".gu")
+	s.Assert().FileExists(string(testLogPathType1) + ".chi")
+	s.Assert().NoFileExists(string(testLogPathType1) + ".pa")
 
-	bs, err := ioutil.ReadFile(string(testLogPath1) + ".chi")
+	bs, err := ioutil.ReadFile(string(testLogPathType1) + ".chi")
 	s.Require().NoError(err)
 	s.Assert().Equal("100\n101\n102\n103\n104\n105\n106\n107\n108\n109\n", string(bs))
 }
@@ -604,11 +633,11 @@ func (s *LogFilterOutputSuite) TestRotate1() {
 func (s *LogFilterOutputSuite) TestRotate2() {
 	output := make(chan string, enoughLineBuffer)
 
-	var st *pLogState
+	var st *outputState
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
 		var err error
-		st, err = pLogOutput(s.log, output, testLogPath1, nil, testMaxLines)
+		st, err = processOutput(s.log, output, testLogPathType1, nil, testMaxLines)
 		return err
 	})
 
@@ -622,11 +651,11 @@ func (s *LogFilterOutputSuite) TestRotate2() {
 	s.Assert().Equal(10, st.Count)
 	s.Assert().Equal(2, st.Rotation)
 
-	s.Assert().NoFileExists(string(testLogPath1) + ".gu")
-	s.Assert().FileExists(string(testLogPath1) + ".chi")
-	s.Assert().FileExists(string(testLogPath1) + ".pa")
+	s.Assert().NoFileExists(string(testLogPathType1) + ".gu")
+	s.Assert().FileExists(string(testLogPathType1) + ".chi")
+	s.Assert().FileExists(string(testLogPathType1) + ".pa")
 
-	bs, err := ioutil.ReadFile(string(testLogPath1) + ".pa")
+	bs, err := ioutil.ReadFile(string(testLogPathType1) + ".pa")
 	s.Require().NoError(err)
 	s.Assert().Equal("200\n201\n202\n203\n204\n205\n206\n207\n208\n209\n", string(bs))
 }
@@ -634,11 +663,11 @@ func (s *LogFilterOutputSuite) TestRotate2() {
 func (s *LogFilterOutputSuite) TestRotate3() {
 	output := make(chan string, enoughLineBuffer)
 
-	var st *pLogState
+	var st *outputState
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
 		var err error
-		st, err = pLogOutput(s.log, output, testLogPath1, nil, testMaxLines)
+		st, err = processOutput(s.log, output, testLogPathType1, nil, testMaxLines)
 		return err
 	})
 
@@ -652,11 +681,11 @@ func (s *LogFilterOutputSuite) TestRotate3() {
 	s.Assert().Equal(10, st.Count)
 	s.Assert().Equal(0, st.Rotation)
 
-	s.Assert().FileExists(string(testLogPath1) + ".gu")
-	s.Assert().NoFileExists(string(testLogPath1) + ".chi")
-	s.Assert().FileExists(string(testLogPath1) + ".pa")
+	s.Assert().FileExists(string(testLogPathType1) + ".gu")
+	s.Assert().NoFileExists(string(testLogPathType1) + ".chi")
+	s.Assert().FileExists(string(testLogPathType1) + ".pa")
 
-	bs, err := ioutil.ReadFile(string(testLogPath1) + ".gu")
+	bs, err := ioutil.ReadFile(string(testLogPathType1) + ".gu")
 	s.Require().NoError(err)
 	s.Assert().Equal("300\n301\n302\n303\n304\n305\n306\n307\n308\n309\n", string(bs))
 }
@@ -664,11 +693,11 @@ func (s *LogFilterOutputSuite) TestRotate3() {
 func (s *LogFilterOutputSuite) TestRotationBorder() {
 	output := make(chan string, enoughLineBuffer)
 
-	var st *pLogState
+	var st *outputState
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
 		var err error
-		st, err = pLogOutput(s.log, output, testLogPath1, nil, testMaxLines)
+		st, err = processOutput(s.log, output, testLogPathType1, nil, testMaxLines)
 		return err
 	})
 
@@ -682,11 +711,11 @@ func (s *LogFilterOutputSuite) TestRotationBorder() {
 	s.Assert().Equal(100, st.Count)
 	s.Assert().Equal(0, st.Rotation)
 
-	s.Assert().FileExists(string(testLogPath1) + ".gu")
-	s.Assert().NoFileExists(string(testLogPath1) + ".chi")
-	s.Assert().NoFileExists(string(testLogPath1) + ".pa")
+	s.Assert().FileExists(string(testLogPathType1) + ".gu")
+	s.Assert().NoFileExists(string(testLogPathType1) + ".chi")
+	s.Assert().NoFileExists(string(testLogPathType1) + ".pa")
 
-	bs, err := ioutil.ReadFile(string(testLogPath1) + ".gu")
+	bs, err := ioutil.ReadFile(string(testLogPathType1) + ".gu")
 	s.Require().NoError(err)
 	s.Assert().Equal(100, bytes.Count(bs, []byte{'\n'}))
 }
@@ -694,11 +723,11 @@ func (s *LogFilterOutputSuite) TestRotationBorder() {
 func (s *LogFilterOutputSuite) TestNoInput() {
 	output := make(chan string, enoughLineBuffer)
 
-	var st *pLogState
+	var st *outputState
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
 		var err error
-		st, err = pLogOutput(s.log, output, testLogPath1, nil, testMaxLines)
+		st, err = processOutput(s.log, output, testLogPathType1, nil, testMaxLines)
 		return err
 	})
 
@@ -709,23 +738,23 @@ func (s *LogFilterOutputSuite) TestNoInput() {
 	s.Assert().Equal(0, st.Count)
 	s.Assert().Equal(0, st.Rotation)
 
-	s.Assert().FileExists(string(testLogPath1) + ".gu")
-	s.Assert().NoFileExists(string(testLogPath1) + ".chi")
-	s.Assert().NoFileExists(string(testLogPath1) + ".pa")
+	s.Assert().FileExists(string(testLogPathType1) + ".gu")
+	s.Assert().NoFileExists(string(testLogPathType1) + ".chi")
+	s.Assert().NoFileExists(string(testLogPathType1) + ".pa")
 }
 
 func (s *LogFilterOutputSuite) TestInitialState() {
 	output := make(chan string, enoughLineBuffer)
 
-	var st *pLogState
+	var st *outputState
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		initState := &pLogState{
+		initState := &outputState{
 			Rotation: 1,
 			Count:    10,
 		}
 		var err error
-		st, err = pLogOutput(s.log, output, testLogPath1, initState, testMaxLines)
+		st, err = processOutput(s.log, output, testLogPathType1, initState, testMaxLines)
 		return err
 	})
 
@@ -740,7 +769,7 @@ func (s *LogFilterOutputSuite) TestInitialState() {
 	s.Assert().Equal(20, st.Count)
 	s.Assert().Equal(2, st.Rotation)
 
-	s.Assert().NoFileExists(string(testLogPath1) + ".gu")
-	s.Assert().FileExists(string(testLogPath1) + ".chi")
-	s.Assert().FileExists(string(testLogPath1) + ".pa")
+	s.Assert().NoFileExists(string(testLogPathType1) + ".gu")
+	s.Assert().FileExists(string(testLogPathType1) + ".chi")
+	s.Assert().FileExists(string(testLogPathType1) + ".pa")
 }
