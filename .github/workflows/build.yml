@@ -41,10 +41,7 @@ jobs:
         path: work/BUILD_NUMBER
 
   test:
-    runs-on: ubuntu-20.04
-    defaults:
-      run:
-        working-directory: test
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-go@v2
@@ -58,7 +55,7 @@ jobs:
       if: always()
       with:
         github_token: ${{secrets.GITHUB_TOKEN}}
-        files: test/work/report.xml
+        files: work/report.xml
 
   release:
     needs:
