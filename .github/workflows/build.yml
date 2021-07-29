@@ -1,0 +1,96 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/SchemaStore/schemastore/master/src/schemas/json/github-workflow.json
+name: CI
+
+on:
+  pull_request:
+    branches:
+    - master
+  push:
+    branches:
+    - master
+    - issue/*
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-go@v2
+      with:
+        go-version: '^1.16.6'
+    - run: go get -u github.com/ahmetb/govvv
+    - name: Generate build number
+      uses: einaregilsson/build-number@v3
+      with:
+        token: ${{secrets.GITHUB_TOKEN}}
+        prefix: build_number_generator
+    - name: Print new build number
+      run: echo "Build number is $BUILD_NUMBER"
+    - name: Save the build number
+      run: echo "$BUILD_NUMBER" > work/BUILD_NUMBER
+    - name: Embed build number into code
+      run: echo "build-$BUILD_NUMBER" > ./VERSION
+    - run: govvv build -o work/logfilter .
+    - uses: actions/upload-artifact@v2
+      with:
+        name: artifact
+        path: work/logfilter
+    - uses: actions/upload-artifact@v2
+      with:
+        name: build-number
+        path: work/BUILD_NUMBER
+
+  test:
+    runs-on: ubuntu-20.04
+    defaults:
+      run:
+        working-directory: test
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-go@v2
+      with:
+        go-version: '^1.16.6'
+    - run: go get -u github.com/jstemmer/go-junit-report
+    - run: go test -v . 2>&1 | tee work/test.log
+    - run: go-junit-report < work/test.log | tee work/report.xml
+    - name: Publish Unit Test Results
+      uses: EnricoMi/publish-unit-test-result-action@v1
+      if: always()
+      with:
+        github_token: ${{secrets.GITHUB_TOKEN}}
+        files: test/work/report.xml
+
+  release:
+    needs:
+    - test
+    - build
+    if: github.ref == 'refs/heads/forked/master'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/download-artifact@v2
+      with:
+        name: artifact
+    - uses: actions/download-artifact@v2
+      with:
+        name: build-number
+    - name: Show artifacts
+      run: ls -laR ./
+    - name: set BUILD_NUMBER
+      run: echo "BUILD_NUMBER=$(< ./BUILD_NUMBER)" >> $GITHUB_ENV
+    - id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      with:
+        tag_name: build-${{env.BUILD_NUMBER}}
+        release_name: Build ${{env.BUILD_NUMBER}}
+        draft: false
+        prerelease: false
+    - uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      with:
+        upload_url: ${{steps.create_release.outputs.upload_url}}
+        asset_path: ./logfilter
+        asset_name: logfilter.build-${{env.BUILD_NUMBER}}-linux-amd64
+        asset_content_type: application/octet-stream
