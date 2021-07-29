@@ -63,9 +63,9 @@ func (s *LogFilterInputTestSuite) TestOneLine() {
 	defer f.Close()
 	f.WriteString("foo\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
-	sleepABit()
 
 	s.Assert().Len(inputCh, 1)
 	s.Assert().Equal("foo", <-inputCh)
@@ -85,9 +85,9 @@ func (s *LogFilterInputTestSuite) TestTwoLinesAtOnce() {
 
 	f.WriteString("foo\nbar\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
-	sleepABit()
 
 	s.Assert().Len(inputCh, 2)
 	s.Assert().Equal("foo", <-inputCh)
@@ -110,9 +110,9 @@ func (s *LogFilterInputTestSuite) TestTwoLinesWithPause() {
 	sleepABit()
 	f.WriteString("bar\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
-	sleepABit()
 
 	s.Assert().Len(inputCh, 2)
 	s.Assert().Equal("foo", <-inputCh)
@@ -135,9 +135,9 @@ func (s *LogFilterInputTestSuite) TestOneLineWithPause() {
 	sleepABit()
 	f.WriteString("bar\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
-	sleepABit()
 
 	s.Assert().Len(inputCh, 1)
 	s.Assert().Equal("foobar", <-inputCh)
@@ -169,9 +169,9 @@ func (s *LogFilterInputTestSuite) TestOneLineWithManyPauses() {
 	sleepABit()
 	f.WriteString("\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
-	sleepABit()
 
 	s.Assert().Len(inputCh, 1)
 	s.Assert().Equal("foobar", <-inputCh)
@@ -191,9 +191,9 @@ func (s *LogFilterInputTestSuite) TestOneLineWithoutNewLine() {
 
 	f.WriteString("foo")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
-	sleepABit()
 
 	s.Assert().Len(inputCh, 0)
 }
@@ -212,9 +212,9 @@ func (s *LogFilterInputTestSuite) TestEmptyLine() {
 
 	f.WriteString("foo\n\n\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
-	sleepABit()
 
 	s.Assert().Len(inputCh, 3)
 	s.Assert().Equal("foo", <-inputCh)
@@ -237,9 +237,9 @@ func (s *LogFilterInputTestSuite) TestLongLine() {
 	f.WriteString(strings.Repeat("1234567890", 12) + "\n")
 	f.WriteString("foo\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
-	sleepABit()
 
 	s.Assert().Len(inputCh, 2)
 	s.Assert().Equal(strings.Repeat("1234567890", 10)+truncatedSign, <-inputCh)
@@ -261,9 +261,9 @@ func (s *LogFilterInputTestSuite) TestLongLongLine() {
 	f.WriteString(strings.Repeat("1234567890", 30) + "\n")
 	f.WriteString("foo\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
-	sleepABit()
 
 	s.Assert().Len(inputCh, 2)
 	s.Assert().Equal(strings.Repeat("1234567890", 10)+truncatedSign, <-inputCh)
@@ -286,9 +286,9 @@ func (s *LogFilterInputTestSuite) TestMaxLine() {
 	f.WriteString(line + "\n")
 	f.WriteString("foo\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
-	sleepABit()
 
 	s.Assert().Len(inputCh, 2)
 	s.Assert().Equal(line, <-inputCh)
@@ -311,9 +311,9 @@ func (s *LogFilterInputTestSuite) TestMaxPlus1Line() {
 	f.WriteString(line + "\n")
 	f.WriteString("foo\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
-	sleepABit()
 
 	s.Assert().Len(inputCh, 2)
 	s.Assert().Equal(line+truncatedSign, <-inputCh)
@@ -336,9 +336,9 @@ func (s *LogFilterInputTestSuite) TestConsecutiveLongLines() {
 	f.WriteString(strings.Repeat("1234567890", 11) + "\n")
 	f.WriteString("foo\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
-	sleepABit()
 
 	s.Assert().Len(inputCh, 3)
 	s.Assert().Equal(strings.Repeat("abcdefghij", 10)+truncatedSign, <-inputCh)
@@ -364,9 +364,9 @@ func (s *LogFilterInputTestSuite) TestConsecutiveLongLinesWithPauses() {
 	sleepABit()
 	f.WriteString("foo\n")
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
-	sleepABit()
 
 	s.Assert().Len(inputCh, 3)
 	s.Assert().Equal(strings.Repeat("abcdefghij", 10)+truncatedSign, <-inputCh)
@@ -393,9 +393,9 @@ func (s *LogFilterInputTestSuite) TestCloseAndOpen() {
 	f2.WriteString("bar\n")
 	f2.Close()
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
-	sleepABit()
 
 	s.Assert().Len(inputCh, 2)
 	s.Assert().Equal("foo", <-inputCh)
@@ -421,9 +421,9 @@ func (s *LogFilterInputTestSuite) TestCloseAndOpenDuringOutputtingALine() {
 	f2.WriteString("bar\n")
 	f2.Close()
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
-	sleepABit()
 
 	s.Assert().Len(inputCh, 1)
 	s.Assert().Equal("foobar", <-inputCh)
@@ -448,9 +448,9 @@ func (s *LogFilterInputTestSuite) TestFIFOCreatedAfterStart() {
 	f.WriteString("foo\n")
 	defer f.Close()
 
+	sleepABit()
 	cancel()
 	s.Assert().NoError(eg.Wait())
-	sleepABit()
 
 	s.Assert().Len(inputCh, 1)
 	s.Assert().Equal("foo", <-inputCh)
