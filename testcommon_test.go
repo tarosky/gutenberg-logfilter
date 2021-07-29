@@ -12,15 +12,14 @@ import (
 )
 
 var (
-	configPath   = mustGetAbsPath("test/config.json")
-	testLogPath1 = mustGetAbsPath("test/work/test1.log")
-	testLogPath2 = mustGetAbsPath("test/work/test2.log")
-	testFIFO1    = mustGetAbsPath("test/work/test1.fifo")
-	testFIFO2    = mustGetAbsPath("test/work/test2.fifo")
-	statePath    = mustGetAbsPath("test/work/state.json")
-	logPath      = mustGetAbsPath("test/work/logfilter.log.json")
-	errorLogPath = mustGetAbsPath("test/work/logfilter.error.log")
-	pidPath      = mustGetAbsPath("test/work/logfilter.pid")
+	configPath       = mustGetAbsPath("test/config.json")
+	testLogPathType1 = mustGetAbsPath("test/work/type1.log")
+	testLogPathType2 = mustGetAbsPath("test/work/type2.log")
+	testFIFO         = mustGetAbsPath("test/work/test.fifo")
+	statePath        = mustGetAbsPath("test/work/state.json")
+	logPath          = mustGetAbsPath("test/work/logfilter.log.json")
+	errorLogPath     = mustGetAbsPath("test/work/logfilter.error.log")
+	pidPath          = mustGetAbsPath("test/work/logfilter.pid")
 )
 
 const (
@@ -50,14 +49,13 @@ func fixWorkDir() {
 }
 
 func removeTestFiles(s *suite.Suite) {
-	s.Require().NoError(os.RemoveAll(string(testLogPath1) + ".gu"))
-	s.Require().NoError(os.RemoveAll(string(testLogPath1) + ".chi"))
-	s.Require().NoError(os.RemoveAll(string(testLogPath1) + ".pa"))
-	s.Require().NoError(os.RemoveAll(string(testLogPath2) + ".gu"))
-	s.Require().NoError(os.RemoveAll(string(testLogPath2) + ".chi"))
-	s.Require().NoError(os.RemoveAll(string(testLogPath2) + ".pa"))
-	s.Require().NoError(os.RemoveAll(string(testFIFO1)))
-	s.Require().NoError(os.RemoveAll(string(testFIFO2)))
+	s.Require().NoError(os.RemoveAll(string(testLogPathType1) + ".gu"))
+	s.Require().NoError(os.RemoveAll(string(testLogPathType1) + ".chi"))
+	s.Require().NoError(os.RemoveAll(string(testLogPathType1) + ".pa"))
+	s.Require().NoError(os.RemoveAll(string(testLogPathType2) + ".gu"))
+	s.Require().NoError(os.RemoveAll(string(testLogPathType2) + ".chi"))
+	s.Require().NoError(os.RemoveAll(string(testLogPathType2) + ".pa"))
+	s.Require().NoError(os.RemoveAll(string(testFIFO)))
 	s.Require().NoError(os.RemoveAll(string(statePath)))
 	s.Require().NoError(os.RemoveAll(string(logPath)))
 	s.Require().NoError(os.RemoveAll(string(errorLogPath)))
@@ -65,8 +63,7 @@ func removeTestFiles(s *suite.Suite) {
 }
 
 func createTestFIFOs(s *suite.Suite) {
-	s.Require().NoError(syscall.Mkfifo(string(testFIFO1), 0644))
-	s.Require().NoError(syscall.Mkfifo(string(testFIFO2), 0644))
+	s.Require().NoError(syscall.Mkfifo(string(testFIFO), 0644))
 }
 
 func sleepABit() {

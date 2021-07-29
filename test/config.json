@@ -1,43 +1,47 @@
 {
-  "logs": [
+  "source": "test/work/test.fifo",
+  "routes": [
     {
-      "source": "test/work/test1.fifo",
-      "filterLists": [
-        [
-          {
-            "match": {
-              "regex": "^JSON:"
-            }
-          },
-          {
-            "extract": {
-              "regex": "\\{[^}]*\\}",
-              "printf": "%[1]s"
-            }
+      "filters": [
+        {
+          "match": {
+            "regex": "^TYPE1:"
           }
-        ],
-        [
-          {
-            "match": {
-              "regex": "^TEXT:"
-            }
-          },
-          {
-            "extract": {
-              "regex": "^TEXT: (.*)",
-              "printf": "{\"message\": \"%[2]s\"}"
-            }
+        },
+        {
+          "extract": {
+            "regex": "\\{[^}]*\\}",
+            "printf": "%[1]s"
           }
-        ]
+        }
       ],
-      "output": "test/work/test1.log"
+      "output": "type1"
     },
     {
-      "source": "test/work/test2.fifo",
-      "filterLists": [],
-      "output": "test/work/test2.log"
+      "filters": [
+        {
+          "match": {
+            "regex": "^TYPE2:"
+          }
+        },
+        {
+          "extract": {
+            "regex": "^TYPE2: (.*)",
+            "printf": "{\"message\": \"%[2]s\"}"
+          }
+        }
+      ],
+      "output": "type2"
     }
   ],
+  "outputs": {
+    "type1": {
+      "path": "test/work/type1.log"
+    },
+    "type2": {
+      "path": "test/work/type2.log"
+    }
+  },
   "maxlines": 10,
   "maxlinelen": 10000,
   "statefile": "test/work/state.json",

@@ -89,15 +89,15 @@ func (s *IntegratedTestSuite) TearDownTest() {
 }
 
 func (s *IntegratedTestSuite) TestSendLog() {
-	f, err := os.OpenFile(string(testFIFO1), os.O_WRONLY|os.O_APPEND, 0644)
+	f, err := os.OpenFile(string(testFIFO), os.O_WRONLY|os.O_APPEND, 0644)
 	s.Assert().NoError(err)
 	defer f.Close()
 
-	f.WriteString("TEXT: foo bar\n")
+	f.WriteString("TYPE2: foo bar\n")
 
 	time.Sleep(time.Second)
 
-	f2, err := os.Open(string(testLogPath1) + ".gu")
+	f2, err := os.Open(string(testLogPathType2) + ".gu")
 	s.Assert().NoError(err)
 
 	bs, err := ioutil.ReadAll(f2)
@@ -107,19 +107,15 @@ func (s *IntegratedTestSuite) TestSendLog() {
 }
 
 func (s *IntegratedTestSuite) TestStateFile() {
-	f1, err := os.OpenFile(string(testFIFO1), os.O_WRONLY|os.O_APPEND, 0644)
+	f, err := os.OpenFile(string(testFIFO), os.O_WRONLY|os.O_APPEND, 0644)
 	s.Assert().NoError(err)
-	defer f1.Close()
-	f2, err := os.OpenFile(string(testFIFO2), os.O_WRONLY|os.O_APPEND, 0644)
-	s.Assert().NoError(err)
-	defer f2.Close()
+	defer f.Close()
 
 	for i := 0; i < 15; i++ {
-		f1.WriteString("foo bar\n")
+		f.WriteString("TYPE1: {foo bar}\n")
 	}
-
 	for i := 0; i < 5; i++ {
-		f2.WriteString("foo bar\n")
+		f.WriteString("TYPE2: baz\n")
 	}
 
 	time.Sleep(time.Second)
@@ -132,28 +128,28 @@ func (s *IntegratedTestSuite) TestStateFile() {
 	m := map[string]map[string]map[string]int{}
 	s.Assert().NoError(json.Unmarshal(js, &m))
 
-	testLogAbsPath1, err := filepath.Abs(string(testLogPath1))
+	testLogAbsPathType1, err := filepath.Abs(string(testLogPathType1))
 	s.Require().NoError(err)
-	testLogAbsPath2, err := filepath.Abs(string(testLogPath2))
+	testLogAbsPathType2, err := filepath.Abs(string(testLogPathType2))
 	s.Require().NoError(err)
 
 	s.Assert().Len(m, 1)
-	s.Assert().Len(m["logs"], 2)
-	s.Assert().Equal(m["logs"][testLogAbsPath1]["rotation"], 1)
-	s.Assert().Equal(m["logs"][testLogAbsPath1]["count"], 5)
-	s.Assert().Equal(m["logs"][testLogAbsPath2]["rotation"], 0)
-	s.Assert().Equal(m["logs"][testLogAbsPath2]["count"], 5)
+	s.Assert().Len(m["outputs"], 2)
+	s.Assert().Equal(1, m["outputs"][testLogAbsPathType1]["rotation"])
+	s.Assert().Equal(5, m["outputs"][testLogAbsPathType1]["count"])
+	s.Assert().Equal(0, m["outputs"][testLogAbsPathType2]["rotation"])
+	s.Assert().Equal(5, m["outputs"][testLogAbsPathType2]["count"])
 }
 
 func (s *IntegratedTestSuite) TestStateFileCloseEarly() {
-	f1, err := os.OpenFile(string(testFIFO1), os.O_WRONLY|os.O_APPEND, 0644)
+	f, err := os.OpenFile(string(testFIFO), os.O_WRONLY|os.O_APPEND, 0644)
 	s.Assert().NoError(err)
 
 	for i := 0; i < 15; i++ {
-		f1.WriteString("foo bar\n")
+		f.WriteString("TYPE1: {foo bar}\n")
 	}
 
-	f1.Close()
+	f.Close()
 
 	time.Sleep(time.Second)
 
@@ -168,15 +164,15 @@ func (s *IntegratedTestSuite) TestStateFileCloseEarly() {
 	m := map[string]map[string]map[string]int{}
 	s.Assert().NoError(json.Unmarshal(js, &m))
 
-	testLogAbsPath1, err := filepath.Abs(string(testLogPath1))
+	testLogAbsPathType1, err := filepath.Abs(string(testLogPathType1))
 	s.Require().NoError(err)
-	testLogAbsPath2, err := filepath.Abs(string(testLogPath2))
+	testLogAbsPathType2, err := filepath.Abs(string(testLogPathType2))
 	s.Require().NoError(err)
 
 	s.Assert().Len(m, 1)
-	s.Assert().Len(m["logs"], 2)
-	s.Assert().Equal(m["logs"][testLogAbsPath1]["rotation"], 1)
-	s.Assert().Equal(m["logs"][testLogAbsPath1]["count"], 5)
-	s.Assert().Equal(m["logs"][testLogAbsPath2]["rotation"], 0)
-	s.Assert().Equal(m["logs"][testLogAbsPath2]["count"], 0)
+	s.Assert().Len(m["outputs"], 2)
+	s.Assert().Equal(1, m["outputs"][testLogAbsPathType1]["rotation"])
+	s.Assert().Equal(5, m["outputs"][testLogAbsPathType1]["count"])
+	s.Assert().Equal(0, m["outputs"][testLogAbsPathType2]["rotation"])
+	s.Assert().Equal(0, m["outputs"][testLogAbsPathType2]["count"])
 }
