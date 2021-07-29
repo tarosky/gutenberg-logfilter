@@ -505,7 +505,6 @@ func run(ctx context.Context, e *environment) error {
 		output := output
 		grp.Go(func() error {
 			st, err := processOutput(e.log, outputsOut[name], output.Path, e.state.Outputs[output.Path], e.MaxLines)
-			e.log.Debug("output ret", zap.Int("count", st.Count), zap.Int("rotation", st.Rotation))
 			stateCh <- &outputStatePair{
 				path:  output.Path,
 				state: st,
@@ -654,7 +653,6 @@ func doProcessInput(
 
 	for {
 		ok, done, err := poller.wait()
-		log.Debug("polled", zap.Bool("ok", ok), zap.Bool("done", done), zap.Error(err))
 		if done {
 			return
 		}
@@ -669,10 +667,10 @@ func doProcessInput(
 		}
 
 		for scan.scan() {
-			log.Debug("scanning")
+			// log.Debug("scanning")
 			inputCh <- scan.text()
 		}
-		log.Debug("scan finished")
+		// log.Debug("scan finished")
 		if err := scan.error(); err != nil {
 			log.Warn("error during scanning", zapSource, zap.Error(err))
 			close(aborted)
