@@ -75,7 +75,17 @@ func (p *poller) wait() (bool, bool, error) {
 	genericError := errors.New("epoll failure")
 
 	events := make([]unix.EpollEvent, 2)
-	n, err := unix.EpollWait(p.epfd, events, -1)
+	var (
+		n   int
+		err error
+	)
+	for {
+		n, err = unix.EpollWait(p.epfd, events, -1)
+		if err != unix.EINTR {
+			break
+		}
+		p.log.Debug("epoll_wait() interrupted, retrying")
+	}
 	if err != nil {
 		p.log.Warn("epoll_wait() returned error", zapSource, zap.Error(err))
 		return false, false, genericError
