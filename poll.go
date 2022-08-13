@@ -84,7 +84,7 @@ func (p *poller) wait() (bool, bool, error) {
 		if err != unix.EINTR {
 			break
 		}
-		p.log.Debug("epoll_wait() interrupted, retrying")
+		// Ignore signal interruption.
 	}
 	if err != nil {
 		p.log.Warn("epoll_wait() returned error", zapSource, zap.Error(err))
@@ -106,10 +106,6 @@ func (p *poller) wait() (bool, bool, error) {
 	for _, event := range events[:n] {
 		switch event.Fd {
 		case int32(p.fifoFD):
-			if event.Events&unix.EPOLLHUP != 0 {
-				p.log.Debug("EPOLLHUP occurred", zapSource, zap.String("fd", "fifo"))
-				// e = genericError
-			}
 			if event.Events&unix.EPOLLERR != 0 {
 				p.log.Warn("EPOLLERR occurred", zapSource, zap.String("fd", "fifo"))
 				e = genericError
