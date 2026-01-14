@@ -1,4 +1,3 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/SchemaStore/schemastore/master/src/schemas/json/github-workflow.json
 name: CI
 
 on:
@@ -14,14 +13,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-go@v2
+    - uses: actions/checkout@main
+    - uses: actions/setup-go@main
       with:
-        go-version: '^1.18.5'
+        go-version: '^1.25.3'
     - run: go get -u github.com/ahmetb/govvv
     - run: go install github.com/ahmetb/govvv
     - name: Generate build number
-      uses: einaregilsson/build-number@v3
+      uses: onyxmueller/build-tag-number@main
       with:
         token: ${{secrets.GITHUB_TOKEN}}
         prefix: build_number_generator
@@ -32,11 +31,11 @@ jobs:
     - name: Embed build number into code
       run: echo "build-$BUILD_NUMBER" > ./VERSION
     - run: govvv build -o work/logfilter .
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@main
       with:
         name: artifact
         path: work/logfilter
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@main
       with:
         name: build-number
         path: work/BUILD_NUMBER
@@ -44,16 +43,16 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-go@v2
+    - uses: actions/checkout@main
+    - uses: actions/setup-go@main
       with:
-        go-version: '^1.18.5'
+        go-version: '^1.25.3'
     - run: go get -u github.com/jstemmer/go-junit-report
     - run: go install github.com/jstemmer/go-junit-report
     - run: go test -v ./... 2>&1 | tee work/test.log
     - run: go-junit-report < work/test.log | tee work/report.xml
     - name: Publish Unit Test Results
-      uses: EnricoMi/publish-unit-test-result-action@v1
+      uses: EnricoMi/publish-unit-test-result-action@master
       if: always()
       with:
         github_token: ${{secrets.GITHUB_TOKEN}}
@@ -65,31 +64,29 @@ jobs:
     - build
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    env:
+      # Workaround for https://github.com/github/vscode-github-actions/issues/222
+      BUILD_NUMBER: ""
     steps:
-    - uses: actions/download-artifact@v2
+    - uses: actions/download-artifact@main
       with:
         name: artifact
-    - uses: actions/download-artifact@v2
+    - uses: actions/download-artifact@main
       with:
         name: build-number
     - name: Show artifacts
       run: ls -laR ./
     - name: set BUILD_NUMBER
       run: echo "BUILD_NUMBER=$(< ./BUILD_NUMBER)" >> $GITHUB_ENV
+    - run: mv logfilter logfilter.build-${{env.BUILD_NUMBER}}-linux-amd64
     - id: create_release
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@master
       env:
         GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       with:
         tag_name: build-${{env.BUILD_NUMBER}}
-        release_name: Build ${{env.BUILD_NUMBER}}
+        name: Build ${{env.BUILD_NUMBER}}
         draft: false
         prerelease: false
-    - uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-      with:
-        upload_url: ${{steps.create_release.outputs.upload_url}}
-        asset_path: ./logfilter
-        asset_name: logfilter.build-${{env.BUILD_NUMBER}}-linux-amd64
-        asset_content_type: application/octet-stream
+        files: |
+          logfilter.*

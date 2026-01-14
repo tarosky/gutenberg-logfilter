@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	stdlog "log"
 	"os"
 	"os/signal"
@@ -15,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/coreos/go-systemd/daemon"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
@@ -187,7 +187,7 @@ func setPIDFile(e *environment, path string) func() {
 	}
 
 	pid := []byte(strconv.Itoa(os.Getpid()))
-	if err := ioutil.WriteFile(path, pid, 0644); err != nil {
+	if err := os.WriteFile(path, pid, 0644); err != nil {
 		e.log.Panic(
 			"failed to create PID file",
 			zap.String("path", path),
@@ -406,7 +406,7 @@ func cliMain(ctx context.Context, args []string) {
 		}
 
 		configPath := mustGetAbsPath("config")
-		configData, err := ioutil.ReadFile(configPath)
+		configData, err := os.ReadFile(configPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to read config data: %s", err.Error())
 			panic(err)
@@ -437,7 +437,7 @@ func cliMain(ctx context.Context, args []string) {
 		removePIDFile := setPIDFile(e, string(cfg.PIDFile))
 		defer removePIDFile()
 
-		sig := make(chan os.Signal)
+		sig := make(chan os.Signal, 1)
 		signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 		go func() {
 			defer func() {
@@ -451,6 +451,8 @@ func cliMain(ctx context.Context, args []string) {
 				cancel()
 			}
 		}()
+
+		_, _ = daemon.SdNotify(false, daemon.SdNotifyReady)
 
 		e.log.Info("loading config done")
 		return run(ctx, e)
@@ -533,7 +535,7 @@ type outputState struct {
 }
 
 func loadState(path AbsolutePath) *state {
-	stateData, err := ioutil.ReadFile(string(path))
+	stateData, err := os.ReadFile(string(path))
 	if err != nil {
 		if os.IsNotExist(err) {
 			stateData = []byte("{}")
@@ -681,7 +683,7 @@ func doProcessInput(
 }
 
 func processRouting(
-	log *myLogger,
+	_ *myLogger,
 	inputCh <-chan string,
 	routes []route,
 	outputCh map[string]chan<- string,
