@@ -503,8 +503,6 @@ func run(ctx context.Context, e *environment) error {
 	})
 
 	for name, output := range e.Outputs {
-		name := name
-		output := output
 		grp.Go(func() error {
 			st, err := processOutput(e.log, outputsOut[name], output.Path, e.state.Outputs[output.Path], e.MaxLines)
 			stateCh <- &outputStatePair{
